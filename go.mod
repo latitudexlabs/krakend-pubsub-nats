@@ -1,6 +1,6 @@
 module github.com/anshulgoel27/krakend-pubsub-nats
 
-go 1.23
+go 1.22.0
 
 require (
 	github.com/luraproject/lura/v2 v2.8.0
