@@ -17,7 +17,7 @@ import (
 var errNoBackendHostDefined = fmt.Errorf("no host backend defined")
 
 const (
-	publisherNamespace = "github_com/anshulgoel27/nats-publisher"
+	publisherNamespace = "github_com/anshulgoel27/krakend-nats-publisher"
 )
 
 func NewBackendFactory(ctx context.Context, logger logging.Logger, bf proxy.BackendFactory) *BackendFactory {
@@ -57,7 +57,7 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 	}
 
 	logPrefix := "[BACKEND: " + cfg.TopicURL + "][PubSub]"
-	url := os.Getenv("NATS_URL")
+	url := os.Getenv("NATS_SERVER_URL")
 	if url == "" {
 		url = nats.DefaultURL
 	}
