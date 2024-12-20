@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/luraproject/lura/v2/config"
 	"github.com/luraproject/lura/v2/logging"
 	"github.com/luraproject/lura/v2/proxy"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 var errNoBackendHostDefined = fmt.Errorf("no host backend defined")
@@ -80,6 +82,8 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 	streamConfig := &nats.StreamConfig{
 		Name:     cfg.StreamName,
 		Subjects: []string{cfg.TopicURL},
+		Storage:  nats.StorageType(jetstream.MemoryStorage),
+		MaxAge:   time.Duration(3 * time.Second),
 	}
 	if _, err := js.AddStream(streamConfig); err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
 		f.logger.Error(fmt.Sprintf("%s Error adding stream: %s", logPrefix, err.Error()))
