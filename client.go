@@ -3,16 +3,15 @@ package pubsub
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"time"
 
 	"github.com/luraproject/lura/v2/config"
 	"github.com/luraproject/lura/v2/logging"
 	"github.com/luraproject/lura/v2/proxy"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 var errNoBackendHostDefined = fmt.Errorf("no host backend defined")
@@ -71,22 +70,22 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 	}
 
 	// Create a JetStream context
-	js, err := nc.JetStream()
+	js, err := jetstream.New(nc)
 	if err != nil {
 		f.logger.Error(fmt.Sprintf("%s Error initializing JetStream: %s", logPrefix, err.Error()))
 		return proxy.NoopProxy, err
 	}
 
-	// Ensure the stream exists
-	streamConfig := &nats.StreamConfig{
-		Name:     cfg.StreamName,
-		Subjects: []string{cfg.TopicURL},
-		MaxAge:   time.Duration(3 * time.Second),
-	}
-	if _, err := js.AddStream(streamConfig); err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
-		f.logger.Error(fmt.Sprintf("%s Error adding stream: %s", logPrefix, err.Error()))
-		return proxy.NoopProxy, err
-	}
+	// // Ensure the stream exists
+	// streamConfig := jetstream.StreamConfig{
+	// 	Name:     cfg.StreamName,
+	// 	Subjects: []string{cfg.TopicURL},
+	// 	MaxAge:   time.Duration(3 * time.Second),
+	// }
+	// if _, err := js.CreateOrUpdateStream(ctx, streamConfig); err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
+	// 	f.logger.Error(fmt.Sprintf("%s Error adding stream: %s", logPrefix, err.Error()))
+	// 	return proxy.NoopProxy, err
+	// }
 
 	f.logger.Debug(fmt.Sprintf("%s Publisher initialized successfully", logPrefix))
 
@@ -120,7 +119,7 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 			Data:    body,
 		}
 
-		if _, err := js.PublishMsg(msg); err != nil {
+		if _, err := js.PublishMsgAsync(msg); err != nil {
 			f.logger.Error(fmt.Sprintf("%s Error publishing message: %s", logPrefix, err.Error()))
 			return nil, err
 		}
@@ -130,8 +129,7 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 }
 
 type publisherCfg struct {
-	TopicURL   string `json:"topic_url"`
-	StreamName string `json:"stream_name"`
+	TopicURL string `json:"topic_url"`
 }
 
 func getConfig(remote *config.Backend, namespace string, v interface{}) error {
