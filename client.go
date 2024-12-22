@@ -51,12 +51,18 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 
 	if err := getConfig(remote, publisherNamespace, cfg); err != nil {
 		if _, ok := err.(*NamespaceNotFoundErr); !ok {
-			f.logger.Error(fmt.Sprintf("[BACKEND][PubSub] Error initializing publisher: %s", err.Error()))
+			f.logger.Error(fmt.Sprintf("[BACKEND][NATS-PubSub] Error initializing publisher: %s", err.Error()))
 		}
 		return proxy.NoopProxy, err
 	}
 
-	logPrefix := "[BACKEND: " + cfg.TopicURL + "][PubSub]"
+	if cfg.TopicQueryKey == "" {
+		err := fmt.Errorf("topic_query_key not provided")
+		f.logger.Error(fmt.Sprintf("[BACKEND][NATS-PubSub] Error initializing publisher: %s", err.Error()))
+		return proxy.NoopProxy, err
+	}
+
+	logPrefix := "[BACKEND][NATS-PubSub]"
 	url := os.Getenv("NATS_SERVER_URL")
 	if url == "" {
 		url = nats.DefaultURL
@@ -76,17 +82,6 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 		return proxy.NoopProxy, err
 	}
 
-	// // Ensure the stream exists
-	// streamConfig := jetstream.StreamConfig{
-	// 	Name:     cfg.StreamName,
-	// 	Subjects: []string{cfg.TopicURL},
-	// 	MaxAge:   time.Duration(3 * time.Second),
-	// }
-	// if _, err := js.CreateOrUpdateStream(ctx, streamConfig); err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
-	// 	f.logger.Error(fmt.Sprintf("%s Error adding stream: %s", logPrefix, err.Error()))
-	// 	return proxy.NoopProxy, err
-	// }
-
 	f.logger.Debug(fmt.Sprintf("%s Publisher initialized successfully", logPrefix))
 
 	// Handle graceful shutdown
@@ -101,21 +96,16 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 			return nil, err
 		}
 
-		headers := map[string]string{}
-		for k, vs := range r.Headers {
-			headers[k] = vs[0]
-		}
-
-		// Convert headers into NATS message headers
-		msgHeaders := nats.Header{}
-		for k, v := range headers {
-			msgHeaders.Set(k, v)
+		topic := r.URL.Query().Get(cfg.TopicQueryKey)
+		if topic == "" {
+			err := fmt.Errorf("invalid topic %s", topic)
+			f.logger.Error(fmt.Sprintf("%s Error publishing message: %s", logPrefix, err.Error()))
+			return nil, err
 		}
 
 		// Publish the message to the topic
 		msg := &nats.Msg{
-			Subject: cfg.TopicURL,
-			Header:  msgHeaders,
+			Subject: topic,
 			Data:    body,
 		}
 
@@ -129,7 +119,7 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 }
 
 type publisherCfg struct {
-	TopicURL string `json:"topic_url"`
+	TopicQueryKey string `json:"topic_query_key"`
 }
 
 func getConfig(remote *config.Backend, namespace string, v interface{}) error {
