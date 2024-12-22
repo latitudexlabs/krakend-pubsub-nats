@@ -103,9 +103,20 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 			return nil, err
 		}
 
+		headers := map[string]string{}
+		for k, vs := range r.Headers {
+			headers[k] = vs[0]
+		}
+		// Convert headers into NATS message headers
+		msgHeaders := nats.Header{}
+		for k, v := range headers {
+			msgHeaders.Set(k, v)
+		}
+
 		// Publish the message to the topic
 		msg := &nats.Msg{
 			Subject: topic,
+			Header:  msgHeaders,
 			Data:    body,
 		}
 
