@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/luraproject/lura/v2/config"
 	"github.com/luraproject/lura/v2/logging"
@@ -67,9 +68,18 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 	if url == "" {
 		url = nats.DefaultURL
 	}
-
+	opts := []nats.Option{
+		nats.ReconnectWait(2 * time.Second), // Wait time between reconnect attempts
+		nats.MaxReconnects(10),              // Max number of reconnection attempts
+		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
+			f.logger.Info("Disconnected from NATS server!")
+		}),
+		nats.ReconnectHandler(func(nc *nats.Conn) {
+			f.logger.Info("Reconnected to NATS server!")
+		}),
+	}
 	// Connect to NATS server
-	nc, err := nats.Connect(url)
+	nc, err := nats.Connect(url, opts...)
 	if err != nil {
 		f.logger.Error(fmt.Sprintf("%s Error connecting to NATS: %s", logPrefix, err.Error()))
 		return proxy.NoopProxy, err
