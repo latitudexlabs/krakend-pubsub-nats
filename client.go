@@ -135,7 +135,9 @@ func (f *BackendFactory) initPublisher(ctx context.Context, remote *config.Backe
 			return nil, err
 		}
 
-		return &proxy.Response{IsComplete: true}, nil
+		return &proxy.Response{Data: map[string]interface{}{
+			"published": true,
+		}, IsComplete: true}, nil
 	}, nil
 }
 
